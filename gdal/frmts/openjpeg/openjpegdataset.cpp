@@ -1601,7 +1601,7 @@ CPLErr JP2OpenJPEGDataset::SetMetadataItem( const char * pszName,
 /*                            Identify()                                */
 /************************************************************************/
 
-static const unsigned char jpc_header[] = {0xff,0x4f};
+static const unsigned char jpc_header[] = {0xff,0x4f,0xff,0x51}; // SOC + RSIZ markers
 static const unsigned char jp2_box_jp[] = {0x6a,0x50,0x20,0x20}; /* 'jP  ' */
 
 int JP2OpenJPEGDataset::Identify( GDALOpenInfo * poOpenInfo )
@@ -1884,6 +1884,9 @@ GDALDataset *JP2OpenJPEGDataset::Open( GDALOpenInfo * poOpenInfo )
     poDS->m_nX0 = psImage->x0;
     poDS->m_nY0 = psImage->y0;
 
+    int nBlockXSize = (int)nTileW;
+    int nBlockYSize = (int)nTileH;
+
     if( CPLFetchBool(poOpenInfo->papszOpenOptions, "USE_TILE_AS_BLOCK", false) )
     {
         poDS->bUseSetDecodeArea = false;
@@ -1894,8 +1897,8 @@ GDALDataset *JP2OpenJPEGDataset::Open( GDALOpenInfo * poOpenInfo )
              nTileW < 32 && nTileH < 32 )
     {
         poDS->bUseSetDecodeArea = true;
-        nTileW = poDS->nRasterXSize;
-        nTileH = poDS->nRasterYSize;
+        nBlockXSize = poDS->nRasterXSize;
+        nBlockYSize = poDS->nRasterYSize;
     }
     else
     {
@@ -1911,10 +1914,10 @@ GDALDataset *JP2OpenJPEGDataset::Open( GDALOpenInfo * poOpenInfo )
             poDS->nRasterYSize < (int)nTileH )
         {
             poDS->bUseSetDecodeArea = TRUE;
-            nTileW = poDS->nRasterXSize;
-            nTileH = poDS->nRasterYSize;
-            if (nTileW > 2048) nTileW = 2048;
-            if (nTileH > 2048) nTileH = 2048;
+            nBlockXSize = poDS->nRasterXSize;
+            nBlockYSize = poDS->nRasterYSize;
+            if (nBlockXSize > 2048) nBlockXSize = 2048;
+            if (nBlockYSize > 2048) nBlockYSize = 2048;
         }
         else if (poDS->bUseSetDecodeArea)
         {
@@ -1927,8 +1930,8 @@ GDALDataset *JP2OpenJPEGDataset::Open( GDALOpenInfo * poOpenInfo )
             }
             else
             {
-                if (nTileW > 1024) nTileW = 1024;
-                if (nTileH > 1024) nTileH = 1024;
+                if (nBlockXSize > 1024) nBlockXSize = 1024;
+                if (nBlockYSize > 1024) nBlockYSize = 1024;
             }
         }
     }
@@ -2140,7 +2143,7 @@ GDALDataset *JP2OpenJPEGDataset::Open( GDALOpenInfo * poOpenInfo )
             new JP2OpenJPEGRasterBand( poDS, iBand, eDataType,
                                         bPromoteTo8Bit ? 8: psImage->comps[iBand-1].prec,
                                         bPromoteTo8Bit,
-                                        nTileW, nTileH);
+                                        nBlockXSize, nBlockYSize);
         if( iBand == 1 && poCT != nullptr )
             poBand->poCT = poCT;
         poDS->SetBand( iBand, poBand );
@@ -2195,15 +2198,13 @@ GDALDataset *JP2OpenJPEGDataset::Open( GDALOpenInfo * poOpenInfo )
         {
             nTileW /= 2;
             nTileH /= 2;
+            nBlockXSize = (int)nTileW;
+            nBlockYSize = (int)nTileH;
         }
         else
         {
-            if (nW < (int)nTileW || nH < (int)nTileH)
-            {
-                nTileW = nW;
-                nTileH = nH;
-                poODS->bUseSetDecodeArea = FALSE;
-            }
+            nBlockXSize = std::min(nW, (int)nTileW);
+            nBlockYSize = std::min(nH, (int)nTileH);
         }
 
         poODS->eColorSpace = poDS->eColorSpace;
@@ -2241,7 +2242,7 @@ GDALDataset *JP2OpenJPEGDataset::Open( GDALOpenInfo * poOpenInfo )
             poODS->SetBand( iBand, new JP2OpenJPEGRasterBand( poODS, iBand, eDataType,
                                                               bPromoteTo8Bit ? 8: psImage->comps[iBand-1].prec,
                                                               bPromoteTo8Bit,
-                                                              nTileW, nTileH ) );
+                                                              nBlockXSize, nBlockYSize ) );
         }
 
         poDS->papoOverviewDS[poDS->nOverviewCount ++] = poODS;
@@ -2490,7 +2491,7 @@ GDALDataset * JP2OpenJPEGDataset::CreateCopy( const char * pszFilename,
         atoi(CSLFetchNameValueDef(papszOptions, "BLOCKXSIZE", "1024"));
     int nBlockYSize =
         atoi(CSLFetchNameValueDef(papszOptions, "BLOCKYSIZE", "1024"));
-    if (nBlockXSize < 32 || nBlockYSize < 32)
+    if (nBlockXSize <= 0 || nBlockYSize <= 0)
     {
         CPLError(CE_Failure, CPLE_NotSupported, "Invalid block size");
         return nullptr;
@@ -2500,6 +2501,12 @@ GDALDataset * JP2OpenJPEGDataset::CreateCopy( const char * pszFilename,
     // dimensions
     if( !CPLFetchBool(papszOptions, "BLOCKSIZE_STRICT", false) )
     {
+        if (nBlockXSize < 32 || nBlockYSize < 32)
+        {
+            CPLError(CE_Failure, CPLE_NotSupported, "Invalid block size");
+            return nullptr;
+        }
+
         if (nXSize < nBlockXSize)
         {
             CPLDebug("OPENJPEG", "Adjusting block width from %d to %d",
@@ -3360,7 +3367,7 @@ GDALDataset * JP2OpenJPEGDataset::CreateCopy( const char * pszFilename,
         {
             CPLError(CE_Warning, CPLE_AppDefined,
                      "INSPIRE_TG=YES implies following GMLJP2 specification which "
-                     "recommends advertize reader requirement 67 feature, and thus JPX capability");
+                     "recommends advertise reader requirement 67 feature, and thus JPX capability");
         }
         else if( poGMLJP2Box != nullptr && bJPXOption )
         {
@@ -3547,19 +3554,16 @@ GDALDataset * JP2OpenJPEGDataset::CreateCopy( const char * pszFilename,
         }
 
         // Add res box if needed
-        double dfXRes = 0.0;
-        double dfYRes = 0.0;
-        int nResUnit = 0;
         GDALJP2Box* poRes = nullptr;
         if( poSrcDS->GetMetadataItem("TIFFTAG_XRESOLUTION") != nullptr
             && poSrcDS->GetMetadataItem("TIFFTAG_YRESOLUTION") != nullptr
             && poSrcDS->GetMetadataItem("TIFFTAG_RESOLUTIONUNIT") != nullptr )
         {
-            dfXRes =
+            double dfXRes =
                 CPLAtof(poSrcDS->GetMetadataItem("TIFFTAG_XRESOLUTION"));
-            dfYRes =
+            double dfYRes =
                 CPLAtof(poSrcDS->GetMetadataItem("TIFFTAG_YRESOLUTION"));
-            nResUnit = atoi(poSrcDS->GetMetadataItem("TIFFTAG_RESOLUTIONUNIT"));
+            int nResUnit = atoi(poSrcDS->GetMetadataItem("TIFFTAG_RESOLUTIONUNIT"));
 #define PIXELS_PER_INCH 2
 #define PIXELS_PER_CM   3
 
@@ -4157,7 +4161,7 @@ void GDALRegister_JP2OpenJPEG()
 "       <Value>PROFILE_1</Value>"
 "   </Option>"
 "   <Option name='INSPIRE_TG' type='boolean' description='Whether to use features that comply with Inspire Orthoimagery Technical Guidelines' default='NO'/>"
-"   <Option name='JPX' type='boolean' description='Whether to advertize JPX features when a GMLJP2 box is written (or use JPX branding if GMLJP2 v2)' default='YES'/>"
+"   <Option name='JPX' type='boolean' description='Whether to advertise JPX features when a GMLJP2 box is written (or use JPX branding if GMLJP2 v2)' default='YES'/>"
 "   <Option name='GEOBOXES_AFTER_JP2C' type='boolean' description='Whether to place GeoJP2/GMLJP2 boxes after the code-stream' default='NO'/>"
 "   <Option name='PRECINCTS' type='string' description='Precincts size as a string of the form {w,h},{w,h},... with power-of-two values'/>"
 "   <Option name='TILEPARTS' type='string-select' description='Whether to generate tile-parts and according to which criterion' default='DISABLED'>"

@@ -4,9 +4,9 @@
 gdalmdiminfo
 ================================================================================
 
-.. versionadded:: 3.1
-
 .. only:: html
+
+    .. versionadded:: 3.1
 
     Reports structure and content of a multidimensional dataset.
 
@@ -19,18 +19,18 @@ Synopsis
 
     gdalmdiminfo [--help-general] [-oo NAME=VALUE]* [-arrayoption NAME=VALUE]*
                  [-detailed] [-nopretty] [-array {array_name}] [-limit {number}]
-                 <datasetname>
+                 [-stats] <datasetname>
 
 Description
 -----------
 
-:program:`gdalinfo` program lists various information about a GDAL supported
+:program:`gdalmdiminfo` program lists various information about a GDAL supported
 multidimensional raster dataset as JSON output. It follows the
 following `JSON schema <https://github.com/OSGeo/gdal/blob/master/gdal/data/gdalmdiminfo_output.schema.json>`_
 
 The following command line parameters can appear in any order
 
-.. program:: gdalinfo
+.. program:: gdalmdiminfo
 
 .. option:: -detailed
 
@@ -60,6 +60,13 @@ The following command line parameters can appear in any order
     Option passed to :cpp:func:`GDALGroup::GetMDArrayNames` to filter reported
     arrays. Such option is format specific. Consult driver documentation.
     This option may be used several times.
+
+.. option:: -stats
+
+    Read and display image statistics. Force computation if no
+    statistics are stored in an image.
+
+    .. versionadded:: 3.2
 
 C API
 -----

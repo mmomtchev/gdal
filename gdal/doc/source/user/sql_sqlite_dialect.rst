@@ -6,9 +6,9 @@ SQL SQLite dialect
 
 .. highlight:: sql
 
-Since GDAL/OGR 1.10, the SQLite "dialect" can be used as an alternate SQL dialect to the
+The SQLite "dialect" can be used as an alternate SQL dialect to the
 :ref:`ogr_sql_dialect`.
-This assumes that GDAL/OGR is built with support for SQLite (>= 3.6), and preferably
+This assumes that GDAL/OGR is built with support for SQLite, and preferably
 with `Spatialite <http://www.gaia-gis.it/spatialite/>`_ support too to benefit from spatial functions.
 
 The SQLite dialect may be used with any OGR datasource, like the OGR SQL dialect. It
@@ -20,6 +20,11 @@ This is mainly aimed to execute SELECT statements, but, for datasources that sup
 update, INSERT/UPDATE/DELETE statements can also be run. GDAL is internally using
 `the Virtual Table Mechanism of SQLite <https://sqlite.org/vtab.html>`_
 and therefore operations like ALTER TABLE are not supported.
+
+If the datasource is SQLite database (GeoPackage, SpatiaLite) then SQLite dialect
+acts as native SQL dialect and Virtual Table Mechanism is not used. It is possible to
+force GDAL to use Virtual Tables even in this case by specifying 
+"-dialect INDIRECT_SQLITE". This should be used only when necessary, since going through the virtual table mechanism might affect performance.
 
 The syntax of the SQL statements is fully the one of the SQLite SQL engine. You can
 refer to the following pages:
@@ -54,6 +59,14 @@ the following syntax : "other_datasource_name"."layer_name".
 .. code-block::
 
     SELECT p.*, NAME FROM poly p JOIN "idlink.dbf"."idlink" il USING (eas_id)
+
+If the master datasource is SQLite database (GeoPackage, SpatiaLite) it is necessary to 
+use indirect SQLite dialect. Otherwise additional datasources are never opened but tables to 
+be used in joins are searched from the master database.
+
+.. code-block:: shell
+
+    ogrinfo jointest.gpkg -dialect INDIRECT_SQLITE -sql "SELECT a.ID,b.ID FROM jointest a JOIN \"jointest2.shp\".\"jointest2\" b ON a.ID=b.ID"
 
 The column names that can be used in the result column list, in WHERE, JOIN, ... clauses
 are the field names of the layers. Expressions, SQLite functions can also be used,
@@ -136,8 +149,8 @@ For example we can select the annotation features as:
 Spatialite SQL functions
 ++++++++++++++++++++++++
 
-When GDAL/OGR is build with support for the <a href="http://www.gaia-gis.it/spatialite/">Spatialite</a> library,
-a lot of <a href="http://www.gaia-gis.it/gaia-sins/spatialite-sql-4.3.0.html">extra SQL functions</a>,
+When GDAL/OGR is build with support for the `Spatialite <http://www.gaia-gis.it/spatialite/>`_ library,
+a lot of `extra SQL functions <http://www.gaia-gis.it/gaia-sins/spatialite-sql-4.3.0.html>`_,
 in particular spatial functions, can be used in results column fields, WHERE clauses, etc....
 
 .. code-block::
@@ -213,7 +226,7 @@ CAST(ogr_inflate(compressed_blob) AS VARCHAR). See CPLZLibInflate().
 Other functions
 +++++++++++++++
 
-Starting with OGR 2.0, the ``hstore_get_value()`` function can be used to extract
+The ``hstore_get_value()`` function can be used to extract
 a value associate to a key from a HSTORE string, formatted like "key=>value,other_key=>other_value,..."
 
 .. code-block::

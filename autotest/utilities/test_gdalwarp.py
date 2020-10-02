@@ -883,7 +883,7 @@ def test_gdalwarp_39():
     if test_cli_utilities.get_gdalwarp_path() is None:
         pytest.skip()
 
-    gdaltest.runexternal(test_cli_utilities.get_gdalwarp_path() + ' ../gdrivers/data/float64.asc tmp/test_gdalwarp_39.tif -oo DATATYPE=Float64 -overwrite')
+    gdaltest.runexternal(test_cli_utilities.get_gdalwarp_path() + ' ../gdrivers/data/aaigrid/float64.asc tmp/test_gdalwarp_39.tif -oo DATATYPE=Float64 -overwrite')
 
     ds = gdal.Open('tmp/test_gdalwarp_39.tif')
     assert ds.GetRasterBand(1).DataType == gdal.GDT_Float64
@@ -959,6 +959,13 @@ def test_gdalwarp_40():
     assert ds.GetRasterBand(1).Checksum() == cs_ov0
     ds = None
 
+    # Should select overview 0 through VRT
+    gdaltest.runexternal(test_cli_utilities.get_gdalwarp_path() + ' tmp/test_gdalwarp_40_src.tif tmp/test_gdalwarp_40.vrt -overwrite -ts 10 10 -te 440720 3750120 441920 3751320 -of VRT')
+
+    ds = gdal.Open('tmp/test_gdalwarp_40.vrt')
+    assert ds.GetRasterBand(1).Checksum() == cs_ov0
+    ds = None
+
     gdaltest.runexternal(test_cli_utilities.get_gdalwarp_path() + ' tmp/test_gdalwarp_40_src.tif -oo OVERVIEW_LEVEL=0 tmp/test_gdalwarp_40.tif -overwrite -ts 7 7')
     ds = gdal.Open('tmp/test_gdalwarp_40.tif')
     expected_cs = ds.GetRasterBand(1).Checksum()
@@ -1016,6 +1023,8 @@ def test_gdalwarp_40():
 
 ###############################################################################
 # Test source fill ratio heuristics (#3120)
+# Also check that we guess a reasonable resolution (#2754), from the source
+# dataset and target extent
 
 
 def test_gdalwarp_41():
@@ -1048,14 +1057,16 @@ def test_gdalwarp_41():
     gdaltest.runexternal(test_cli_utilities.get_gdalwarp_path() + ' tmp/test_gdalwarp_41_src.tif tmp/test_gdalwarp_41.tif -overwrite  -t_srs EPSG:4326 -te -180 -90 180 90  -wo INIT_DEST=127 -wo SKIP_NOSOURCE=YES')
 
     ds = gdal.Open('tmp/test_gdalwarp_41.tif')
-    assert ds.GetRasterBand(1).Checksum() == 25945
+    assert ds.RasterXSize == 2052
+    assert ds.RasterYSize == 1026
+    assert ds.GetRasterBand(1).Checksum() == 57091
     ds = None
 
     # Check when source fill ratio heuristics is OFF
     gdaltest.runexternal(test_cli_utilities.get_gdalwarp_path() + ' tmp/test_gdalwarp_41_src.tif tmp/test_gdalwarp_41.tif -overwrite  -t_srs EPSG:4326 -te -180 -90 180 90  -wo INIT_DEST=127 -wo SKIP_NOSOURCE=YES -wo SRC_FILL_RATIO_HEURISTICS=NO')
 
     ds = gdal.Open('tmp/test_gdalwarp_41.tif')
-    assert ds.GetRasterBand(1).Checksum() == 65068
+    assert ds.GetRasterBand(1).Checksum() == 31890
     ds = None
 
 ###############################################################################
@@ -1243,6 +1254,25 @@ def test_gdalwarp_47_append_subdataset():
 
     ds = None
     gdal.Unlink(tmpfilename)
+
+
+###############################################################################
+# Test -if option
+
+
+def test_gdalwarp_if_option():
+    if test_cli_utilities.get_gdalwarp_path() is None:
+        pytest.skip()
+
+    ret, err = gdaltest.runexternal_out_and_err(test_cli_utilities.get_gdalwarp_path() + ' -if GTiff ../gcore/data/byte.tif /vsimem/out.tif')
+    assert err is None or err == ''
+
+    _, err = gdaltest.runexternal_out_and_err(test_cli_utilities.get_gdalwarp_path() + ' -if invalid_driver_name ../gcore/data/byte.tif /vsimem/out.tif')
+    assert err is not None
+    assert 'invalid_driver_name' in err
+
+    _, err = gdaltest.runexternal_out_and_err(test_cli_utilities.get_gdalwarp_path() + ' -if HFA ../gcore/data/byte.tif /vsimem/out.tif')
+    assert err is not None
 
 ###############################################################################
 # Cleanup

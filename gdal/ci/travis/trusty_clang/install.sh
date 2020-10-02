@@ -7,13 +7,6 @@ export CCACHE_CPP2=yes
 export CC="ccache clang"
 export CXX="ccache clang++"
 
-cd gdal
-scripts/detect_tabulations.sh
-scripts/detect_printf.sh
-scripts/detect_self_assignment.sh
-scripts/detect_suspicious_char_digit_zero.sh
-cd ..
-
 SCRIPT_DIR=$(dirname "$0")
 case $SCRIPT_DIR in
     "/"*)
@@ -70,10 +63,6 @@ make USER_DEFS="-Wextra -Werror" -j3
 cd swig/perl
 make generate
 make
-cd ../..
-cd swig/csharp
-make generate
-make 2>/tmp/log.txt || cat /tmp/log.txt
 cd ../..
 sudo rm -f /usr/lib/libgdal.so*
 sudo rm -f /usr/include/gdal*.h /usr/include/ogr*.h /usr/include/gnm*.h /usr/include/cpl*.h 

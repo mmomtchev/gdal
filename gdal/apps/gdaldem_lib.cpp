@@ -1572,7 +1572,7 @@ static void GDALColorReliefProcessColors(ColorAssociation **ppasColorAssociation
             }
             else
             {
-                // Fallback to the old behaviour: keep equivalent entries as
+                // Fallback to the old behavior: keep equivalent entries as
                 // they are.
             }
 
@@ -1919,8 +1919,16 @@ ColorAssociation* GDALColorReliefParseColorFile( GDALRasterBandH hSrcBand,
             pasColorAssociation = static_cast<ColorAssociation *>(
                 CPLRealloc(pasColorAssociation,
                            (nColorAssociation + 1) * sizeof(ColorAssociation)));
-            if( EQUAL(papszFields[0], "nv") && bSrcHasNoData )
+            if( EQUAL(papszFields[0], "nv") )
             {
+                if( !bSrcHasNoData )
+                {
+                    CPLError(CE_Warning, CPLE_AppDefined,
+                             "Input dataset has no nodata value. "
+                             "Ignoring 'nv' entry in color palette");
+                    CSLDestroy(papszFields);
+                    continue;
+                }
                 pasColorAssociation[nColorAssociation].dfVal = dfSrcNoDataValue;
             }
             else if( strlen(papszFields[0]) > 1 &&
@@ -3322,7 +3330,7 @@ static Algorithm GetAlgorithm(const char* pszProcessing)
  * should be NULL otherwise)
  * @param psOptionsIn the options struct returned by
  * GDALDEMProcessingOptionsNew() or NULL.
- * @param pbUsageError the pointer to int variable to determine any usage
+ * @param pbUsageError pointer to a integer output variable to store if any usage
  * error has occurred or NULL.
  * @return the output dataset (new dataset that must be closed using
  * GDALClose()) or NULL in case of error.

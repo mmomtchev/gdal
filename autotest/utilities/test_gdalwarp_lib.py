@@ -752,7 +752,7 @@ def test_gdalwarp_lib_121():
 
     # Will create an implicit options structure
     with gdaltest.error_handler():
-        gdal.wrapper_GDALWarpDestName('', [], None, gdal.TermProgress)
+        gdal.wrapper_GDALWarpDestName('', [], None, gdal.TermProgress_nocb)
 
     # Null dest name
     try:
@@ -766,7 +766,7 @@ def test_gdalwarp_lib_121():
 
     # Will create an implicit options structure
     with gdaltest.error_handler():
-        gdal.wrapper_GDALWarpDestDS(gdal.GetDriverByName('MEM').Create('', 1, 1), [], None, gdal.TermProgress)
+        gdal.wrapper_GDALWarpDestDS(gdal.GetDriverByName('MEM').Create('', 1, 1), [], None, gdal.TermProgress_nocb)
 
     
 ###############################################################################
@@ -1979,6 +1979,49 @@ def test_gdalwarp_lib_multiple_source_incompatible_buildvrt_to_cog_reprojection_
     gdal.Unlink('/vsimem/left.tif')
     gdal.Unlink('/vsimem/right.tif')
 
+###############################################################################
+
+def test_gdalwarp_lib_no_crs():
+
+    src_ds = gdal.GetDriverByName('MEM').Create('', 1, 1)
+    src_ds.SetGeoTransform([0, 10, 0, 0, 0, -10])
+    out_ds = gdal.Warp('', src_ds, options = '-of MEM -ct "+proj=unitconvert +xy_in=1 +xy_out=2"')
+    assert out_ds.GetGeoTransform() == (0.0, 5.0, 0.0, 0.0, 0.0, -5.0)
+
+
+###############################################################################
+# Test that the warp kernel properly computes the resampling kernel xsize
+# when wraping along the antimeridian (related to #2754)
+
+def test_gdalwarp_lib_xscale_antimeridian():
+
+    sr = osr.SpatialReference()
+    sr.SetFromUserInput("WGS84")
+
+    src1_ds = gdal.GetDriverByName('GTiff').Create('/vsimem/src1.tif', 1000, 1000)
+    src1_ds.SetGeoTransform([179, 0.001, 0, 50, 0, -0.001])
+    src1_ds.SetProjection(sr.ExportToWkt())
+    src1_ds.GetRasterBand(1).Fill(100)
+    src1_ds = None
+
+    src2_ds = gdal.GetDriverByName('GTiff').Create('/vsimem/src2.tif', 1000, 1000)
+    src2_ds.SetGeoTransform([-180, 0.001, 0, 50, 0, -0.001])
+    src2_ds.SetProjection(sr.ExportToWkt())
+    src2_ds.GetRasterBand(1).Fill(200)
+    src2_ds = None
+
+    source = gdal.BuildVRT('', ['/vsimem/src1.tif', '/vsimem/src2.tif'])
+    # Wrap to UTM zone 1 accross the antimeridian
+    ds = gdal.Warp('', source, options="-of MEM -t_srs EPSG:32601 -te 276000 5464000 290000 5510000 -tr 1000 1000 -r cubic")
+    vals = struct.unpack('B' * ds.RasterXSize * ds.RasterYSize, ds.ReadRaster())
+    assert vals[0] == 100
+    assert vals[ds.RasterXSize - 1] == 200
+    # Check that the set of values is jsut 100 and 200. If the xscale was wrong,
+    # we would take intou account 0 values outsize of the 2 tiles.
+    assert set(vals) == set([100, 200])
+
+    gdal.Unlink('/vsimem/src1.tif')
+    gdal.Unlink('/vsimem/src2.tif')
 
 ###############################################################################
 # Cleanup

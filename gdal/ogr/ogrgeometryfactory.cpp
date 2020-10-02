@@ -1301,6 +1301,111 @@ OGRGeometryH OGR_G_ForceToMultiLineString( OGRGeometryH hGeom )
 }
 
 /************************************************************************/
+/*                      removeLowerDimensionSubGeoms()                  */
+/************************************************************************/
+
+/** \brief Remove sub-geometries from a geometry collection that do not have
+ *         the maximum topological dimensionality of the collection.
+ *
+ * This is typically to be used as a cleanup phase after running OGRGeometry::MakeValid()
+ *
+ * For example, MakeValid() on a polygon can return a geometry collection of
+ * polygons and linestrings. Calling this method will return either a polygon
+ * or multipolygon by dropping those linestrings.
+ *
+ * On a non-geometry collection, this will return a clone of the passed geometry.
+ *
+ * @param poGeom input geometry
+ * @return a new geometry.
+ *
+ * @since GDAL 3.1.0
+ */
+OGRGeometry* OGRGeometryFactory::removeLowerDimensionSubGeoms( const OGRGeometry* poGeom )
+{
+    if( poGeom == nullptr )
+        return nullptr;
+    if( wkbFlatten(poGeom->getGeometryType()) != wkbGeometryCollection ||
+        poGeom->IsEmpty() )
+    {
+        return poGeom->clone();
+    }
+    const OGRGeometryCollection* poGC = poGeom->toGeometryCollection();
+    int nMaxDim = 0;
+    OGRBoolean bHasCurve = FALSE;
+    for( const auto poSubGeom: *poGC )
+    {
+        nMaxDim = std::max(nMaxDim, poSubGeom->getDimension());
+        bHasCurve |= poSubGeom->hasCurveGeometry();
+    }
+    int nCountAtMaxDim = 0;
+    const OGRGeometry* poGeomAtMaxDim = nullptr;
+    for( const auto poSubGeom: *poGC )
+    {
+        if( poSubGeom->getDimension() == nMaxDim )
+        {
+            poGeomAtMaxDim = poSubGeom;
+            nCountAtMaxDim ++;
+        }
+    }
+    if( nCountAtMaxDim == 1 && poGeomAtMaxDim != nullptr )
+    {
+        return poGeomAtMaxDim->clone();
+    }
+    OGRGeometryCollection* poRet =
+        (nMaxDim == 0) ?               static_cast<OGRGeometryCollection*>(new OGRMultiPoint()) :
+        (nMaxDim == 1 && !bHasCurve) ? static_cast<OGRGeometryCollection*>(new OGRMultiLineString()) :
+        (nMaxDim == 1 && bHasCurve) ?  static_cast<OGRGeometryCollection*>(new OGRMultiCurve()) :
+        (nMaxDim == 2 && !bHasCurve) ? static_cast<OGRGeometryCollection*>(new OGRMultiPolygon()) :
+                                       static_cast<OGRGeometryCollection*>(new OGRMultiSurface());
+    for( const auto poSubGeom: *poGC )
+    {
+        if( poSubGeom->getDimension() == nMaxDim )
+        {
+            if( OGR_GT_IsSubClassOf(poSubGeom->getGeometryType(), wkbGeometryCollection) )
+            {
+                const OGRGeometryCollection* poSubGeomAsGC = poSubGeom->toGeometryCollection();
+                for( const auto poSubSubGeom: *poSubGeomAsGC )
+                {
+                    if( poSubSubGeom->getDimension() == nMaxDim )
+                    {
+                        poRet->addGeometryDirectly(poSubSubGeom->clone());
+                    }
+                }
+            }
+            else
+            {
+                poRet->addGeometryDirectly(poSubGeom->clone());
+            }
+        }
+    }
+    return poRet;
+}
+
+/************************************************************************/
+/*                  OGR_G_RemoveLowerDimensionSubGeoms()                */
+/************************************************************************/
+
+/** \brief Remove sub-geometries from a geometry collection that do not have
+ *         the maximum topological dimensionality of the collection.
+ *
+ * This function is the same as the C++ method
+ * OGRGeometryFactory::removeLowerDimensionSubGeoms().
+ *
+ * @param hGeom handle to the geometry to convert
+ * @return a new geometry.
+ *
+ * @since GDAL 3.1.0
+ */
+
+OGRGeometryH OGR_G_RemoveLowerDimensionSubGeoms( const OGRGeometryH hGeom )
+
+{
+    return OGRGeometry::ToHandle(
+        OGRGeometryFactory::removeLowerDimensionSubGeoms(
+            OGRGeometry::FromHandle(hGeom)));
+}
+
+/************************************************************************/
 /*                          organizePolygons()                          */
 /************************************************************************/
 
@@ -1392,7 +1497,7 @@ enum OrganizePolygonMethod
  * with care.
  *
  * If the OGR_ORGANIZE_POLYGONS configuration option is defined, its value will override
- * the value of the METHOD option of papszOptions (useful to modify the behaviour of the
+ * the value of the METHOD option of papszOptions (useful to modify the behavior of the
  * shapefile driver)
  *
  * @param papoPolygons array of geometry pointers - should all be OGRPolygons.
@@ -2819,12 +2924,17 @@ static void CutGeometryOnDateLineAndAddToMulti( OGRGeometryCollection* poMulti,
                 {
                     double dfMaxSmallDiffLong = 0;
                     bool bHasBigDiff = false;
+                    bool bOnlyAtPlusMinus180 = poLS->getNumPoints() > 0 &&
+                        ( fabs(fabs(poLS->getX(0)) - 180) < 1e-10 );
                     // Detect big gaps in longitude.
                     for( int i = 1; i < poLS->getNumPoints(); i++ )
                     {
                         const double dfPrevX = poLS->getX(i-1) + dfXOffset;
                         const double dfX = poLS->getX(i) + dfXOffset;
                         const double dfDiffLong = fabs(dfX - dfPrevX);
+                        if( fabs(fabs(poLS->getX(i)) - 180) > 1e-10 )
+                            bOnlyAtPlusMinus180 = false;
+
                         if( dfDiffLong > dfDiffSpace &&
                             ((dfX > dfLeftBorderX &&
                               dfPrevX < dfRightBorderX) ||
@@ -2834,7 +2944,8 @@ static void CutGeometryOnDateLineAndAddToMulti( OGRGeometryCollection* poMulti,
                         else if( dfDiffLong > dfMaxSmallDiffLong )
                             dfMaxSmallDiffLong = dfDiffLong;
                     }
-                    if( bHasBigDiff && dfMaxSmallDiffLong < dfDateLineOffset )
+                    if( bHasBigDiff && !bOnlyAtPlusMinus180 &&
+                        dfMaxSmallDiffLong < dfDateLineOffset )
                     {
                         if( eGeomType == wkbLineString )
                             bSplitLineStringAtDateline = true;
@@ -3492,92 +3603,69 @@ static OGRGeometry* TransformBeforeAntimeridianToWGS84(
 
     const double EPS = 1e-9;
 
-    // Build a multipolygon (in projected space) with 2 parts: one part left
-    // of the antimeridian, one part east
-    const OGRwkbGeometryType eType = wkbFlatten(poDstGeom->getGeometryType());
-
-    // If we have lines, then to get better accuracy of the intersection with
-    // the main geometry, we need to add extra points
-    const bool bHasLines = (eType == wkbLineString ||
-                            eType == wkbMultiLineString);
-
-    OGRLinearRing* poLR1 = new OGRLinearRing();
-    poLR1->addPoint( sEnvelope.MinX, sEnvelope.MinY );
-    if( bHasLines )
+    // Build a very thin polygon cutting the antimeridian at our points
+    OGRLinearRing* poLR = new OGRLinearRing;
     {
-        double x = 180.0 - EPS;
+        double x = 180.0-EPS;
         double y = aoPoints[0].y-EPS;
         poRevCT->Transform(1, &x, &y);
-        poLR1->addPoint( x, y );
+        poLR->addPoint( x, y );
     }
     for( const auto& oPoint: aoPoints )
     {
-        double x = 180.0 - EPS;
+        double x = 180.0-EPS;
         double y = oPoint.y;
         poRevCT->Transform(1, &x, &y);
-        poLR1->addPoint( x, y );
+        poLR->addPoint( x, y );
     }
-    if( bHasLines )
     {
-        double x = 180.0 - EPS;
+        double x = 180.0-EPS;
         double y = aoPoints.back().y+EPS;
         poRevCT->Transform(1, &x, &y);
-        poLR1->addPoint( x, y );
+        poLR->addPoint( x, y );
     }
-    poLR1->addPoint( sEnvelope.MinX, sEnvelope.MaxY );
-    poLR1->addPoint( sEnvelope.MinX, sEnvelope.MinY );
-    OGRPolygon* poPoly1 = new OGRPolygon();
-    poPoly1->addRingDirectly( poLR1 );
-
-
-    OGRLinearRing* poLR2 = new OGRLinearRing();
-    poLR2->addPoint( sEnvelope.MaxX, sEnvelope.MinY );
-    if( bHasLines )
     {
-        double x = -180.0 + EPS;
+        double x = 180.0+EPS;
+        double y = aoPoints.back().y+EPS;
+        poRevCT->Transform(1, &x, &y);
+        poLR->addPoint( x, y );
+    }
+    for( size_t i = aoPoints.size(); i > 0; )
+    {
+        --i;
+        const OGRRawPoint& oPoint = aoPoints[i];
+        double x = 180.0+EPS;
+        double y = oPoint.y;
+        poRevCT->Transform(1, &x, &y);
+        poLR->addPoint( x, y );
+    }
+    {
+        double x = 180.0+EPS;
         double y = aoPoints[0].y-EPS;
         poRevCT->Transform(1, &x, &y);
-        poLR2->addPoint( x, y );
+        poLR->addPoint( x, y );
     }
-    for( const auto& oPoint: aoPoints )
-    {
-        double x = -180.0 + EPS;
-        double y = oPoint.y;
-        poRevCT->Transform(1, &x, &y);
-        poLR2->addPoint( x, y );
-    }
-    if( bHasLines )
-    {
-        double x = -180.0 + EPS;
-        double y = aoPoints.back().y+EPS;
-        poRevCT->Transform(1, &x, &y);
-        poLR2->addPoint( x, y );
-    }
-    poLR2->addPoint( sEnvelope.MaxX, sEnvelope.MaxY );
-    poLR2->addPoint( sEnvelope.MaxX, sEnvelope.MinY );
-    OGRPolygon* poPoly2 = new OGRPolygon();
-    poPoly2->addRingDirectly( poLR2 );
+    poLR->closeRings();
 
-    OGRMultiPolygon oMP;
-    oMP.addGeometryDirectly(poPoly1);
-    oMP.addGeometryDirectly(poPoly2);
+    OGRPolygon oPolyToCut;
+    oPolyToCut.addRingDirectly(poLR);
 
 #if DEBUG_VERBOSE
     char* pszWKT = NULL;
-    oMP.exportToWkt(&pszWKT);
-    CPLDebug("OGR", "MP without antimeridian: %s", pszWKT);
+    oPolyToCut.exportToWkt(&pszWKT);
+    CPLDebug("OGR", "Geometry to cut: %s", pszWKT);
     CPLFree(pszWKT);
 #endif
 
     // Get the geometry without the antimeridian
-    OGRGeometry* poInter = poDstGeom->Intersection(&oMP);
+    OGRGeometry* poInter = poDstGeom->Difference(&oPolyToCut);
     if( poInter != nullptr )
     {
         delete poDstGeom;
         poDstGeom = poInter;
+        bNeedPostCorrectionOut = true;
     }
 
-    bNeedPostCorrectionOut = true;
     return poDstGeom;
 }
 
@@ -3699,7 +3787,7 @@ OGRGeometryFactory::TransformWithOptionsCache::~TransformWithOptionsCache()
  * @param poSrcGeom source geometry
  * @param poCT coordinate transformation object, or NULL.
  * @param papszOptions options. Including WRAPDATELINE=YES and DATELINEOFFSET=.
- * @param cache Cache. May increase performance if persisted between invokations
+ * @param cache Cache. May increase performance if persisted between invocations
  * @return (new) transformed geometry.
  */
 OGRGeometry* OGRGeometryFactory::transformWithOptions(

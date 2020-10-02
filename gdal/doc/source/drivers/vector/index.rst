@@ -67,6 +67,8 @@ Vector drivers
    jml
    kml
    libkml
+   lvbag
+   mapml
    mdb
    memory
    mitab
@@ -94,7 +96,6 @@ Vector drivers
    pg
    plscenes
    s57
-   sde
    sdts
    segukooa
    segy

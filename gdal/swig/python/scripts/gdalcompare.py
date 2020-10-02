@@ -243,7 +243,7 @@ def compare_sds(golden_db, new_db, options=None):
     golden_sds = golden_db.GetMetadata('SUBDATASETS')
     new_sds = new_db.GetMetadata('SUBDATASETS')
 
-    count = len(list(golden_sds.keys())) / 2
+    count = len(list(golden_sds.keys())) // 2
     for i in range(count):
         key = 'SUBDATASET_%d_NAME' % (i + 1)
 
@@ -255,6 +255,33 @@ def compare_sds(golden_db, new_db, options=None):
         if sds_diff > 0:
             print('%d differences found between:\n  %s\n  %s'
                   % (sds_diff, golden_sds[key], new_sds[key]))
+
+    return found_diff
+
+#######################################################
+
+
+def find_diff(golden_file, new_file, check_sds=False):
+    # Compare Files
+    found_diff = 0
+
+    # compare raw binary files.
+    try:
+        os.stat(golden_file)
+
+        if not filecmp.cmp(golden_file, new_file):
+            print('Files differ at the binary level.')
+            found_diff += 1
+    except OSError:
+        print('Skipped binary file comparison, golden file not in filesystem.')
+
+    # compare as GDAL Datasets.
+    golden_db = gdal.Open(golden_file)
+    new_db = gdal.Open(new_file)
+    found_diff += compare_db(golden_db, new_db)
+
+    if check_sds:
+        found_diff += compare_sds(golden_db, new_db)
 
     return found_diff
 
@@ -299,34 +326,12 @@ if __name__ == '__main__':
             new_file = argv[i]
 
         else:
-            print('Urecognised argument: ' + argv[i])
+            print('Unrecognised argument: ' + argv[i])
             Usage()
 
         i = i + 1
         # next argument
 
-    # Compare Files
-
-    found_diff = 0
-
-    # compare raw binary files.
-    try:
-        os.stat(golden_file)
-
-        if not filecmp.cmp(golden_file, new_file):
-            print('Files differ at the binary level.')
-            found_diff += 1
-    except OSError:
-        print('Skipped binary file comparison, golden file not in filesystem.')
-
-    # compare as GDAL Datasets.
-    golden_db = gdal.Open(golden_file)
-    new_db = gdal.Open(new_file)
-    found_diff += compare_db(golden_db, new_db)
-
-    if check_sds:
-        found_diff += compare_sds(golden_db, new_db)
-
+    found_diff = find_diff(golden_file, new_file, check_sds)
     print('Differences Found: ' + str(found_diff))
-
     sys.exit(found_diff)

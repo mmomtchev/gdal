@@ -20,7 +20,7 @@ Synopsis
                   [-e] [-a nodata] [-v] [-q] [-h] [-k] [-n] [-u url]
                   [-w webviewer] [-t title] [-c copyright]
                   [--processes=NB_PROCESSES] [--xyz]
-                  --tilesize=TILESIZE
+                  --tilesize=PIXELS
                   [-g googlekey] [-b bingkey] input_file [output_dir]
 
 Description
@@ -52,6 +52,10 @@ can publish a picture without proper georeferencing too.
 
   Tile cutting profile (mercator, geodetic, raster) - default 'mercator' (Google Maps compatible).
 
+  Starting with GDAL 3.2, additional profiles are available from tms_XXXX.json files
+  placed in GDAL data directory (provided all zoom levels use same origin, tile dimensions,
+  and resolution between consecutive zoom levels vary by a factor of two).
+
 .. option:: -r <RESAMPLING>, --resampling=<RESAMPLING>
 
   Resampling method (average, near, bilinear, cubic, cubicspline, lanczos, antialias, mode, max, min, med, q1, q3) - default 'average'.
@@ -62,7 +66,9 @@ can publish a picture without proper georeferencing too.
 
 .. option:: --xyz
 
-  Generate XYZ tiles (OSM Slippy Map standard) instead of TSM
+  Generate XYZ tiles (OSM Slippy Map standard) instead of TMS.
+  In the default mode (TMS), tiles at y=0 are the southern-most tiles, whereas
+  in XYZ mode (used by OGC WMTS too), tiles at y=0 are the northern-most tiles.
 
   .. versionadded:: 3.1
 
@@ -76,7 +82,8 @@ can publish a picture without proper georeferencing too.
 
 .. option:: -a <NODATA>, --srcnodata=<NODATA>
 
-  NODATA transparency value to assign to the input data.
+  Value in the input dataset considered as transparent. If the input dataset
+  had already an associate nodata value, it is overriden by the specified value.
 
 .. option:: -v, --verbose
 
@@ -90,13 +97,13 @@ can publish a picture without proper georeferencing too.
 
 .. option:: --processes=<NB_PROCESSES>
 
-  Number of processes to use for tiling.
+  Number of parallel processes to use for tiling, to speed-up the computation.
 
   .. versionadded:: 2.3
 
-.. option:: --tilesize=<TILESIZE>
+.. option:: --tilesize=<PIXELS>
 
-  Pixel size of the tiles.
+  Width and height in pixel of a tile. Default is 256.
 
   .. versionadded:: 3.1
 
@@ -134,7 +141,7 @@ Options for generated HTML viewers a la Google Maps
 
 .. option:: -w <WEBVIEWER>, --webviewer=<WEBVIEWER>
 
-  Web viewer to generate (all, google, openlayers, leaflet, none) - default 'all'.
+  Web viewer to generate (all, google, openlayers, leaflet, mapml, none) - default 'all'.
 
 .. option:: -t <TITLE>, --title=<TITLE>
 
@@ -157,6 +164,31 @@ Options for generated HTML viewers a la Google Maps
 
     gdal2tiles.py is a Python script that needs to be run against Python GDAL binding.
 
+MapML options
++++++++++++++
+
+MapML support is new to GDAL 3.2. When --webviewer=mapml is specified,
+--xyz is implied, as well as --tmscompatible if --profile=geodetic.
+
+The following profiles are supported:
+
+- mercator: mapped to OSMTILE MapML tiling scheme
+- geodetic: mapped to WGS84 MapML tiling scheme
+- APSTILE: from the tms_MapML_APSTILE.json data file
+- CBMTILE: from the tms_MapML_CBMTILE.json data file
+
+The generated MapML file in the output directory is ``mapml.mapl``
+
+Available options are:
+
+.. option:: --mapml-template=<filename>
+
+    Filename of a template mapml file where variables will
+    be substituted. If not specified, the generic
+    template_tiles.mapml file from GDAL data resources
+    will be used
+
+The --url option is also used to substitue ``${URL}`` in the template MapML file.
 
 Examples
 --------
@@ -166,3 +198,10 @@ Basic example:
 .. code-block::
 
   gdal2tiles.py --zoom=2-5 input.tif output_folder
+
+
+MapML generation:
+
+.. code-block::
+
+  gdal2tiles.py --zoom=16-18 -w mapml -p APSTILE --url "https://example.com" input.tif output_folder

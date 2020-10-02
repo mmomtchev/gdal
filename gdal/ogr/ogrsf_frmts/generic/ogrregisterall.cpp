@@ -54,6 +54,9 @@ void OGRRegisterAllInternal()
 #ifdef NTF_ENABLED
     RegisterOGRNTF();
 #endif
+#ifdef LVBAG_ENABLED
+    RegisterOGRLVBAG();
+#endif
 #ifdef SDTS_ENABLED
     RegisterOGRSDTS();
 #endif
@@ -148,9 +151,6 @@ void OGRRegisterAllInternal()
 #endif
 #ifdef INGRES_ENABLED
     RegisterOGRIngres();
-#endif
-#ifdef SDE_ENABLED
-    RegisterOGRSDE();
 #endif
 /* Register OpenFileGDB before FGDB as it is more capable for read-only */
 #ifdef OPENFILEGDB_ENABLED
@@ -308,6 +308,12 @@ void OGRRegisterAllInternal()
 #ifdef MVT_ENABLED
     RegisterOGRMVT();
 #endif
+#ifdef NGW_ENABLED
+    RegisterOGRNGW();
+#endif // NGW_ENABLED
+#ifdef MAPML_ENABLED
+    RegisterOGRMapML();
+#endif
 
 /* Put TIGER and AVCBIN at end since they need poOpenInfo->GetSiblingFiles() */
 #ifdef TIGER_ENABLED
@@ -318,8 +324,5 @@ void OGRRegisterAllInternal()
     RegisterOGRAVCE00();
 #endif
 
-#ifdef NGW_ENABLED
-    RegisterOGRNGW();
-#endif // NGW_ENABLED
 
 } /* OGRRegisterAll */

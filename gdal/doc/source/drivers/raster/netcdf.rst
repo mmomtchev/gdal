@@ -296,13 +296,6 @@ Variables attributes for: tos, lon, lat and time
      time#bounds=time_bnds
      time#original_units=seconds since 2001-1-1
 
-Driver Improvements (GDAL >= 1.9.0)
------------------------------------
-
-The driver has undergone significant changes in GDAL 1.9.0, see NEWS
-file and `NetCDF
-Improvements <http://trac.osgeo.org/gdal/wiki/NetCDF_Improvements>`__.
-
 Important Changes
 ~~~~~~~~~~~~~~~~~
 
@@ -422,7 +415,7 @@ NetCDF-4 groups on reading:
 
 -  When searching for a variable containing auxiliary information on the
    selected subdataset, like coordinate variables or grid_mapping, we
-   now also search in parent groups and their childs as specified in
+   now also search in parent groups and their children as specified in
    `Support of groups in
    CF <https://github.com/cf-convention/cf-conventions/issues/144>`__
 
@@ -449,6 +442,26 @@ The :cpp:func:`GDALGroup::GetMDArrayNames` method supports the following options
 - SHOW_TIME=YES/NO. Defaults to YES. If set to NO,
   single-dimensional variables whose ``standard_name`` attribute is "time"
   will not be listed.
+
+The :cpp:func:`GDALGroup::CreateMDArray` method supports the following options:
+
+- NC_TYPE=NC_CHAR/NC_BYTE/NC_INT64/NC_UINT64: to overload the netCDF data type
+  normally deduced from the GDAL data type passed to CreateMDArray().
+  NC_CHAR can only be used for strings of a fixed size.
+- BLOCKSIZE=size_dim0,size_dim1,...,size_dimN: to set the netCDF chunk size,
+  as set by nc_def_var_chunking(). There must be exactly as many values as the
+  number of dimensions passed to CreateMDArray()
+- COMPRESS=DEFLATE: to ask for deflate compression
+- ZLEVEL=number: DEFLATE compression level (1-9)
+- CHECKSUM=YES/NO: Whether to turn on Fletcher32 checksums. Checksum generation
+  requires chunking, and if no explicit chunking has been asked with the
+  BLOCKSIZE option, a default one will be used. Defaults to NO.
+- FILTER=filterid,param1,...,paramN: Define a filter (typically a compression
+  method) used for writing. This should be a list of numeric values, separated
+  by commas. The first value is the filter id (list of potential values at
+  https://support.hdfgroup.org/services/contributions.html#filters) and following
+  values are per-filter parameters. More details about netCDF-4 filter support at
+  https://www.unidata.ucar.edu/software/netcdf/docs/md__Users_wfisher_Desktop_docs_netcdf-c_docs_filters.html
 
 Driver building
 ---------------

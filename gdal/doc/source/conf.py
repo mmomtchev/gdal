@@ -22,7 +22,6 @@ project = 'GDAL'
 copyright = '1998-' + str(datetime.date.today().year)
 author = 'Frank Warmerdam, Even Rouault, and others'
 
-
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be
@@ -86,6 +85,8 @@ html_show_sourcelink = False
 
 html_logo = '../images/gdalicon.png'
 
+html_favicon = '../images/favicon.png'
+
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
@@ -96,6 +97,7 @@ author_silker = 'Silke Reimer <silke@intevation.de>'
 author_mikhailg = 'Mikhail Gusev <gusevmihs@gmail.com>'
 author_dmitryb = 'Dmitry Baryshnikov <polimax@mail.ru>'
 author_evenr = 'Even Rouault <even.rouault@spatialys.com>'
+author_tamass = 'Tamas Szekeres <szekerest@gmail.com>'
 
 man_pages = [
     (
@@ -106,10 +108,24 @@ man_pages = [
         1
     ),
     (
+        'programs/gdalmdiminfo',
+        'gdalmdiminfo',
+        u'Reports structure and content of a multidimensional dataset',
+        [author_evenr],
+        1
+    ),
+    (
         'programs/gdal_translate',
         'gdal_translate',
         u'Converts raster data between different formats.',
         [author_frankw, author_silker],
+        1
+    ),
+    (
+        'programs/gdalmdimtranslate',
+        'gdalmdimtranslate',
+        u'Converts multidimensional data between different formats, and perform subsetting.',
+        [author_evenr],
         1
     ),
     (
@@ -152,6 +168,20 @@ man_pages = [
         'gdaldem',
         u'Tools to analyze and visualize DEMs.',
         ['Matthew Perry <perrygeo@gmail.com>', author_evenr, 'Howard Butler <hobu.inc@gmail.com>', 'Chris Yesson <chris.yesson@ioz.ac.uk>'],
+        1
+    ),
+    (
+        'programs/gdal_viewshed',
+        'gdal_viewshed',
+        u'Calculates a viewshed raster from an input raster DEM for a user defined point',
+        [author_tamass],
+        1
+    ),
+    (
+        'programs/gdal_create',
+        'gdal_create',
+        u'Create a raster file (without source dataset)',
+        [author_evenr],
         1
     ),
     (
@@ -389,7 +419,7 @@ latex_elements = {
 }
 
 latex_documents = [
-    ('index_pdf', 'gdal.tex', project, author, 'manual'),
+    ('index_pdf', 'gdal.tex', project + ' Documentation', author, 'manual'),
 ]
 
 latex_toplevel_sectioning = 'chapter'
@@ -410,7 +440,6 @@ breathe_default_project = "api"
 # Tell sphinx what the primary language being documented is.
 primary_domain = 'cpp'
 
-import redirects
-redirect_files = redirects.gather_redirects()
+# -- Redirects --------------------------------------------------
 
-
+enable_redirects = False

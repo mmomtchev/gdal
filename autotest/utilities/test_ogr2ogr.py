@@ -519,24 +519,21 @@ def test_ogr2ogr_18():
 
     gdaltest.runexternal(test_cli_utilities.get_ogr2ogr_path() + ' -wrapdateline -t_srs EPSG:4326 tmp/wrapdateline_dst.shp tmp/wrapdateline_src.shp')
 
-    expected_wkt = 'MULTIPOLYGON (((-179.667822828781 36.0983491954137,-179.974688335419 27.0898861430767,-180.0 27.0904291236983,-180.0 36.1071354433546,-179.667822828781 36.0983491954137)),((180.0 27.0904291237411,179.017505655195 27.1079795236252,179.222391385437 36.1240958321293,180.0 36.1071354433546,180.0 27.0904291237411)))'
+    expected_wkt = 'MULTIPOLYGON (((179.222391385437 36.124095832137,180.0 36.1071354434926,180.0 36.107135443432,180.0 27.0904291237556,179.017505655194 27.1079795236266,179.222391385437 36.124095832137)),((-180 36.1071354434425,-179.667822828784 36.0983491954849,-179.974688335432 27.0898861430914,-180 27.0904291237129,-180 27.090429123727,-180 36.107135443432,-180 36.1071354434425)))'
+    expected_wkt2 = 'MULTIPOLYGON (((179.017505655194 27.1079795236266,179.222391385437 36.124095832137,180.0 36.1071354434926,180.0 36.107135443432,180.0 27.0904291237556,179.017505655194 27.1079795236266)),((-180 27.090429123727,-180 36.107135443432,-180 36.1071354434425,-179.667822828784 36.0983491954849,-179.974688335432 27.0898861430914,-180 27.0904291237129,-180 27.090429123727)))' # with geos OverlayNG
 
-    expected_geom = ogr.CreateGeometryFromWkt(expected_wkt)
     ds = ogr.Open('tmp/wrapdateline_dst.shp')
     lyr = ds.GetLayer(0)
     feat = lyr.GetNextFeature()
     got_wkt = feat.GetGeometryRef().ExportToWkt()
-    ret = ogrtest.check_feature_geometry(feat, expected_geom)
+    ok = ogrtest.check_feature_geometry(feat, expected_wkt) == 0 or ogrtest.check_feature_geometry(feat, expected_wkt2) == 0
     feat.Destroy()
-    expected_geom.Destroy()
     ds.Destroy()
 
     ogr.GetDriverByName('ESRI Shapefile').DeleteDataSource('tmp/wrapdateline_src.shp')
     ogr.GetDriverByName('ESRI Shapefile').DeleteDataSource('tmp/wrapdateline_dst.shp')
 
-    if ret == 0:
-        return
-    pytest.fail(got_wkt)
+    assert ok, got_wkt
 
 ###############################################################################
 # Test -clipsrc
@@ -969,13 +966,13 @@ def test_ogr2ogr_30():
     if test_cli_utilities.get_ogr2ogr_path() is None:
         pytest.skip()
 
-    ds = ogr.Open('../ogr/data/testlistfields.gml')
+    ds = ogr.Open('../ogr/data/gml/testlistfields.gml')
     if ds is None:
         pytest.skip()
     ds = None
 
-    gdaltest.runexternal(test_cli_utilities.get_ogr2ogr_path() + ' -splitlistfields tmp/test_ogr2ogr_30.dbf ../ogr/data/testlistfields.gml')
-    gdal.Unlink('../ogr/data//testlistfields.gfs')
+    gdaltest.runexternal(test_cli_utilities.get_ogr2ogr_path() + ' -splitlistfields tmp/test_ogr2ogr_30.dbf ../ogr/data/gml/testlistfields.gml')
+    gdal.Unlink('../ogr/data/gml/testlistfields.gfs')
 
     ds = ogr.Open('tmp/test_ogr2ogr_30.dbf')
     assert ds is not None
@@ -1235,9 +1232,9 @@ def test_ogr2ogr_37():
     shutil.copy('../ogr/data/poly.shp', 'tmp/test_ogr2ogr_37_src')
     shutil.copy('../ogr/data/poly.shx', 'tmp/test_ogr2ogr_37_src')
     shutil.copy('../ogr/data/poly.dbf', 'tmp/test_ogr2ogr_37_src')
-    shutil.copy('../ogr/data/testpoly.shp', 'tmp/test_ogr2ogr_37_src')
-    shutil.copy('../ogr/data/testpoly.shx', 'tmp/test_ogr2ogr_37_src')
-    shutil.copy('../ogr/data/testpoly.dbf', 'tmp/test_ogr2ogr_37_src')
+    shutil.copy('../ogr/data/shp/testpoly.shp', 'tmp/test_ogr2ogr_37_src')
+    shutil.copy('../ogr/data/shp/testpoly.shx', 'tmp/test_ogr2ogr_37_src')
+    shutil.copy('../ogr/data/shp/testpoly.dbf', 'tmp/test_ogr2ogr_37_src')
 
     gdaltest.runexternal(test_cli_utilities.get_ogr2ogr_path() + ' tmp/test_ogr2ogr_37_dir.shp tmp/test_ogr2ogr_37_src')
 
@@ -1296,9 +1293,9 @@ def test_ogr2ogr_39():
     shutil.copy('../ogr/data/poly.shp', 'tmp/test_ogr2ogr_39_src')
     shutil.copy('../ogr/data/poly.shx', 'tmp/test_ogr2ogr_39_src')
     shutil.copy('../ogr/data/poly.dbf', 'tmp/test_ogr2ogr_39_src')
-    shutil.copy('../ogr/data/testpoly.shp', 'tmp/test_ogr2ogr_39_src')
-    shutil.copy('../ogr/data/testpoly.shx', 'tmp/test_ogr2ogr_39_src')
-    shutil.copy('../ogr/data/testpoly.dbf', 'tmp/test_ogr2ogr_39_src')
+    shutil.copy('../ogr/data/shp/testpoly.shp', 'tmp/test_ogr2ogr_39_src')
+    shutil.copy('../ogr/data/shp/testpoly.shx', 'tmp/test_ogr2ogr_39_src')
+    shutil.copy('../ogr/data/shp/testpoly.dbf', 'tmp/test_ogr2ogr_39_src')
 
     gdaltest.runexternal(test_cli_utilities.get_ogr2ogr_path() + ' tmp/test_ogr2ogr_39.shp tmp/test_ogr2ogr_39_src -sql "select * from poly"')
 

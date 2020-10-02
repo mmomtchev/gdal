@@ -111,7 +111,7 @@ void RegisterOGRCouchDB()
     poDriver->SetDescription( "CouchDB" );
     poDriver->SetMetadataItem( GDAL_DCAP_VECTOR, "YES" );
     poDriver->SetMetadataItem( GDAL_DMD_LONGNAME, "CouchDB / GeoCouch" );
-    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "drv_couchdb.html" );
+    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "drivers/vector/couchdb.html" );
     poDriver->SetMetadataItem( GDAL_DMD_CONNECTION_PREFIX, "CouchDB:" );
     poDriver->SetMetadataItem( GDAL_DMD_CREATIONOPTIONLIST,
                                "<CreationOptionList/>");
@@ -119,7 +119,7 @@ void RegisterOGRCouchDB()
     poDriver->SetMetadataItem( GDAL_DS_LAYER_CREATIONOPTIONLIST,
     "<LayerCreationOptionList>"
     "  <Option name='UPDATE_PERMISSIONS' type='string' description='Update permissions for the new layer.'/>"
-    "  <Option name='GEOJSON ' type='boolean' description='Whether to write documents as GeoJSON documents.' default='YES'/>"
+    "  <Option name='GEOJSON' type='boolean' description='Whether to write documents as GeoJSON documents.' default='YES'/>"
     "  <Option name='COORDINATE_PRECISION' type='int' description='Maximum number of figures after decimal separator to write in coordinates.' default='15'/>"
     "</LayerCreationOptionList>");
 

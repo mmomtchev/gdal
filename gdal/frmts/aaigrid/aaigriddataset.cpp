@@ -1037,11 +1037,11 @@ GDALDataset *AAIGDataset::CommonOpen( GDALOpenInfo *poOpenInfo,
         // Scan for dot in subsequent chunks of data.
         while( !VSIFEofL(poDS->fp) )
         {
-            CPL_IGNORE_RET_VAL(VSIFReadL(pabyChunk, nChunkSize, 1, poDS->fp));
+            const size_t nLen = VSIFReadL(pabyChunk, 1, nChunkSize, poDS->fp);
 
-            for( int i = 0; i < static_cast<int>(nChunkSize); i++)
+            for( size_t i = 0; i < nLen; i++)
             {
-                GByte ch = pabyChunk[i];
+                const GByte ch = pabyChunk[i];
                 if (ch == '.' || ch == ',' || ch == 'e' || ch == 'E')
                 {
                     poDS->eDataType = GDT_Float32;
@@ -1519,13 +1519,13 @@ void GDALRegister_AAIGrid()
 "   <Option name='SIGNIFICANT_DIGITS' type='int' description='Number of significant digits when writing floating-point numbers(%g).'/>\n"
 "</CreationOptionList>\n");
     poDriver->SetMetadataItem(GDAL_DMD_OPENOPTIONLIST,
-"<OpenOptionLists>\n"
+"<OpenOptionList>\n"
 "   <Option name='DATATYPE' type='string-select' description='Data type to be used.'>\n"
 "       <Value>Int32</Value>\n"
 "       <Value>Float32</Value>\n"
 "       <Value>Float64</Value>\n"
 "   </Option>\n"
-"</OpenOptionLists>\n");
+"</OpenOptionList>\n");
 
     poDriver->pfnOpen = AAIGDataset::Open;
     poDriver->pfnIdentify = AAIGDataset::Identify;

@@ -65,7 +65,11 @@ def test_grib_1():
 def test_grib_2():
 
     tst = gdaltest.GDALTest('GRIB', 'grib/Sample_QuikSCAT.grb', 4, 50714)
-    return tst.testOpen()
+    tst.testOpen()
+
+    ds = gdal.Open('data/grib/Sample_QuikSCAT.grb')
+    assert ds.GetRasterBand(1).GetNoDataValue() == 9999.0
+    assert ds.GetRasterBand(1).GetNoDataValue() == 9999.0 # do it again to test correct caching
 
 ###############################################################################
 # This file has different raster sizes for some of the products, which
@@ -258,10 +262,16 @@ def test_grib_grib1_read_rotated_pole_lonlat():
     assert ds.RasterXSize == 726 and ds.RasterYSize == 550, \
         'Did not get expected dimensions'
 
+    assert ds.GetRasterBand(1).GetNoDataValue() is None
+    assert ds.GetRasterBand(1).GetNoDataValue() is None # do it again to test correct caching
+
     projection = ds.GetProjectionRef()
     expected_projection_proj_7 = 'GEOGCRS["Coordinate System imported from GRIB file",BASEGEOGCRS["Coordinate System imported from GRIB file",DATUM["unnamed",ELLIPSOID["Sphere",6367470,0,LENGTHUNIT["metre",1,ID["EPSG",9001]]]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]]],DERIVINGCONVERSION["Pole rotation (GRIB convention)",METHOD["Pole rotation (GRIB convention)"],PARAMETER["Latitude of the southern pole (GRIB convention)",-30,ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]],PARAMETER["Longitude of the southern pole (GRIB convention)",-15,ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]],PARAMETER["Axis rotation (GRIB convention)",0,ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]]],CS[ellipsoidal,2],AXIS["latitude",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]],AXIS["longitude",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]]]'
     expected_projection_before_proj_7 = 'PROJCS["unnamed",GEOGCS["Coordinate System imported from GRIB file",DATUM["unnamed",SPHEROID["Sphere",6367470,0]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]]],PROJECTION["Rotated_pole"],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],EXTENSION["PROJ4","+proj=ob_tran +lon_0=-15 +o_proj=longlat +o_lon_p=0 +o_lat_p=30 +a=6367470 +b=6367470 +to_meter=0.0174532925199 +wktext"]]'
     assert projection in (expected_projection_proj_7, expected_projection_before_proj_7), projection
+
+    if projection == expected_projection_proj_7:
+        assert ds.GetSpatialRef().IsDerivedGeographic()
 
     gt = ds.GetGeoTransform()
     expected_gt = (-30.25, 0.1, 0.0, 24.15, 0.0, -0.1)
@@ -1139,9 +1149,9 @@ def test_grib_grib2_write_data_encodings_warnings_and_errors():
     tests += [['data/byte.tif', ['JPEG2000_DRIVER=THIS_IS_NOT_A_J2K_DRIVER']]]  # non-existing driver
     tests += [['data/byte.tif', ['JPEG2000_DRIVER=DERIVED']]]  # Read-only driver
     tests += [['../gcore/data/cfloat32.tif', []]]  # complex data type
-    tests += [['data/float64.asc', []]]  # no projection
-    tests += [['data/byte.sgi', []]]  # no geotransform
-    tests += [['data/rotation.img', []]]  # geotransform with rotation terms
+    tests += [['data/aaigrid/float64.asc', []]]  # no projection
+    tests += [['data/test_nosrs.vrt', []]]  # no geotransform
+    tests += [['data/envi/rotation.img', []]]  # geotransform with rotation terms
     gdal.GetDriverByName('GTiff').Create('/vsimem/huge.tif', 65535, 65535, 1, options=['SPARSE_OK=YES'])
     tests += [['/vsimem/huge.tif', []]]  # too many pixels
 
@@ -1297,7 +1307,7 @@ def test_grib_grib2_template_4_48():
 
 def test_grib_grib2_scan_flag_not_64():
 
-    ds = gdal.Open('/vsisparse/data/blend.t17z.master.f001.co.grib2.sparse.xml')
+    ds = gdal.Open('/vsisparse/data/grib/blend.t17z.master.f001.co.grib2.sparse.xml')
     gt = ds.GetGeoTransform()
     expected_gt = (-3272421.457337171, 2539.703, 0.0, 3790842.1060354356, 0.0, -2539.703)
     assert gt == pytest.approx(expected_gt, rel=1e-6)

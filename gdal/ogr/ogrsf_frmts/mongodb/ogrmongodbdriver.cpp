@@ -2438,8 +2438,8 @@ int OGRMongoDBDataSource::ListLayers(const char* pszDatabase)
         {
             const std::string& osCollection(*oIter);
             if( !STARTS_WITH(osCollection.c_str(), "system.") &&
-                osCollection != "startup_log" &&
-                osCollection != "_ogr_metadata" )
+                osCollection != std::string("startup_log") &&
+                osCollection != std::string("_ogr_metadata") )
             {
                 m_apoLayers.push_back(new OGRMongoDBLayer(this,
                                                       pszDatabase,
@@ -2818,7 +2818,7 @@ void RegisterOGRMongoDB()
     poDriver->SetDescription( "MongoDB" );
     poDriver->SetMetadataItem( GDAL_DCAP_VECTOR, "YES" );
     poDriver->SetMetadataItem( GDAL_DMD_LONGNAME, "MongoDB" );
-    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "drv_mongodb.html" );
+    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "drivers/vector/mongodb.html" );
 
     poDriver->SetMetadataItem( GDAL_DMD_CONNECTION_PREFIX, "MongoDB:" );
 

@@ -58,6 +58,11 @@ performed.
 .. option:: --type=<datatype>
 
     Output datatype, must be one of [``Int32``, ``Int16``, ``Float64``, ``UInt16``, ``Byte``, ``UInt32``, ``Float32``].
+ 
+    .. note::
+    
+       Despite the datatype set using ``--type``, when doing intermediate aritmethic operations using operands of the
+       same type, the operation result will honor the original datatype. This may lead into unexpected results in the final result.
     
 .. option:: --format=<gdal_format>
 
@@ -106,9 +111,24 @@ Average of two layers:
 .. code-block::
 
     gdal_calc.py -A input.tif -B input2.tif --outfile=result.tif --calc="(A+B)/2"
+    
+.. note::
+
+   In the previous example, beware that if A and B inputs are of the same datatype, for example integers, you
+   may need to force the convertion of one of the operands before the division operation.
+   
+   .. code-block::
+
+      gdal_calc.py -A input.tif -B input2.tif --outfile=result.tif --calc="(A.astype(numpy.float64) + B) / 2"
 
 Set values of zero and below to null:
 
 .. code-block::
 
     gdal_calc.py -A input.tif --outfile=result.tif --calc="A*(A>0)" --NoDataValue=0
+    
+Using logical operator to keep a range of values from input:
+
+.. code-block::
+
+    gdal_calc.py -A input.tif --outfile=result.tif --calc="A*logical_and(A>100,A<150)"

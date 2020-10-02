@@ -152,7 +152,7 @@ void GRIBRasterBand::FindPDSTemplate()
     GByte abySection0[16];
     VSIFSeekL(poGDS->fp, start, SEEK_SET);
     VSIFReadL(abySection0, 16, 1, poGDS->fp);
-    GByte nDiscipline = abySection0[7 - 1]; 
+    GByte nDiscipline = abySection0[7 - 1];
     CPLString osDiscipline;
     osDiscipline = CPLString().Printf("%d", nDiscipline);
     static const char * const table00[] = {
@@ -784,17 +784,21 @@ double GRIBRasterBand::GetNoDataValue( int *pbSuccess )
         ReadGribData(poGDS->fp, start, subgNum, nullptr, &m_Grib_MetaData);
         if( m_Grib_MetaData == nullptr )
         {
-            if (pbSuccess)
-            *pbSuccess = FALSE;
-            return 0;
+            m_bHasNoData = false;
+            m_dfNoData = 0;
+            if( pbSuccess )
+                *pbSuccess = m_bHasNoData;
+            return m_dfNoData;
         }
     }
 
     if( m_Grib_MetaData->gridAttrib.f_miss == 0)
     {
+        m_bHasNoData = false;
+        m_dfNoData = 0;
         if (pbSuccess)
-            *pbSuccess = FALSE;
-        return 0;
+            *pbSuccess = m_bHasNoData;
+        return m_dfNoData;
     }
 
     if (m_Grib_MetaData->gridAttrib.f_miss == 2)
@@ -804,9 +808,11 @@ double GRIBRasterBand::GetNoDataValue( int *pbSuccess )
                  nBand, m_Grib_MetaData->gridAttrib.missSec);
     }
 
+    m_bHasNoData = true;
+    m_dfNoData = m_Grib_MetaData->gridAttrib.missPri;
     if (pbSuccess)
-        *pbSuccess = TRUE;
-    return m_Grib_MetaData->gridAttrib.missPri;
+        *pbSuccess = m_bHasNoData;
+    return m_dfNoData;
 }
 
 /************************************************************************/
@@ -1577,7 +1583,7 @@ void GRIBArray::Finalize(GRIBGroup* poGroup, inventoryType *psInv)
 
     std::shared_ptr<GDALDimension> poDimTime;
 
-    for( const auto poDim: poGroup->m_dims )
+    for( const auto& poDim: poGroup->m_dims )
     {
         if( STARTS_WITH(poDim->GetName().c_str(), "TIME") &&
             poDim->GetSize() == m_adfTimes.size() )
@@ -1940,6 +1946,15 @@ GDALDataset *GRIBDataset::OpenMultiDim( GDALOpenInfo *poOpenInfo )
 
     poDS->fp = nullptr;
     poDS->m_poRootGroup = poRootGroup;
+
+    poDS->SetDescription(poOpenInfo->pszFilename);
+
+    // Release hGRIBMutex otherwise we'll deadlock with GDALDataset own
+    // hGRIBMutex.
+    CPLReleaseMutex(hGRIBMutex);
+    poDS->TryLoadXML();
+    CPLAcquireMutex(hGRIBMutex, 1000.0);
+
     return poDS;
 }
 
@@ -1998,7 +2013,7 @@ void GRIBDataset::SetGribMetaData(grib_MetaData *meta)
         break;
     case GS3_ALBERS_EQUAL_AREA:
         oSRS.SetACEA(meta->gds.scaleLat1, meta->gds.scaleLat2, meta->gds.meshLat,
-                    meta->gds.orientLon, 0.0, 0.0); 
+                    meta->gds.orientLon, 0.0, 0.0);
         break;
 
     case GS3_ORTHOGRAPHIC:
@@ -2304,7 +2319,7 @@ char** GDALGRIBDriver::GetMetadata(const char* pszDomain)
             if( !aosJ2KDrivers.empty() )
                 osCreationOptionList +=
 "       <Value>JPEG2000</Value>";
-            osCreationOptionList += 
+            osCreationOptionList +=
 "   </Option>"
 "   <Option name='NBITS' type='int' default='0' "
     "description='Number of bits per value'/>"
@@ -2316,7 +2331,7 @@ char** GDALGRIBDriver::GetMetadata(const char* pszDomain)
             if( !aosJ2KDrivers.empty() )
             {
                 osCreationOptionList +=
-"   <Option name='COMPRESSION_RATIO' type='int' default='1' min='1' max='100'"
+"   <Option name='COMPRESSION_RATIO' type='int' default='1' min='1' max='100' "
     "description='N:1 target compression ratio for JPEG2000'/>"
 "   <Option name='JPEG2000_DRIVER' type='string-select' "
     "description='Explicitly select a JPEG2000 driver'>";
